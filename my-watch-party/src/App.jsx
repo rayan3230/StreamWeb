@@ -68,7 +68,8 @@ export default function App() {
   }
 
   function makeRoomId() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+    // generate a simple 6-digit numeric id (zero-padded)
+    return Math.floor(Math.random() * 1000000).toString().padStart(6, '0')
   }
 
   async function createRoom() {
