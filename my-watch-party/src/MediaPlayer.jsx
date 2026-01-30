@@ -24,6 +24,20 @@ function sendControlCommands(iframeEl, cmd, value) {
   candidates.forEach((m) => tryPostMessage(w, m))
 }
 
+function clearIframeProgressViaPostMessage(iframeEl, media) {
+  if (!iframeEl || !iframeEl.contentWindow || !media) return
+  const w = iframeEl.contentWindow
+  const { id, type } = media
+  const candidates = [
+    { action: 'clear_progress', id, type },
+    { command: 'clearProgress', id, type },
+    { event: 'command', func: 'clearProgress', args: [id, type] },
+    { method: 'resetProgress', params: [id] },
+    { action: 'reset_progress', id }
+  ]
+  candidates.forEach(m => tryPostMessage(w, m))
+}
+
 export default function MediaPlayer({ media }) {
   const iframeRef = useRef(null)
   const lastMediaRef = useRef(null)
@@ -45,6 +59,12 @@ export default function MediaPlayer({ media }) {
     // If same content (same id/season/episode), attempt to control via postMessage instead of reloading
     const sameContent = last && last.id === id && last.type === type && (type === 'movie' || (last.season === season && last.episode === episode))
     if (sameContent && iframe) {
+      // if host requested clearing saved progress, try to tell the iframe to forget its stored progress
+      if (media._clearLocalProgress) {
+        clearIframeProgressViaPostMessage(iframe, media)
+        // remove the transient flag so we don't keep sending it
+        media._clearLocalProgress = false
+      }
       // attempt to play/pause/seek via postMessage
       if (_autoPlay === true) {
         sendControlCommands(iframe, 'play')
@@ -56,6 +76,13 @@ export default function MediaPlayer({ media }) {
         sendControlCommands(iframe, 'seek', Number(startAt))
       }
       // don't reload iframe
+    }
+    // if loading new iframe instance and a clear was requested, try to clear after iframe loads
+    if (!sameContent && iframe && media._clearLocalProgress) {
+      // attempt immediately (iframe may not be ready), and again shortly after
+      clearIframeProgressViaPostMessage(iframe, media)
+      setTimeout(() => clearIframeProgressViaPostMessage(iframe, media), 800)
+      media._clearLocalProgress = false
     }
     // update lastMediaRef
     lastMediaRef.current = { ...media }

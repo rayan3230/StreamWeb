@@ -35,6 +35,16 @@ export default function App() {
       alert('Not authorized to perform: ' + (info?.action || 'action'))
     })
     socket.on('media-updated', (m) => setMedia(m))
+    socket.on('force-sync', (payload) => {
+      // payload may include media so clients can clear local progress before seeking
+      if (!payload) return
+      const { media: m, currentTime, isPlaying } = payload
+      if (m) {
+        setMedia(prev => ({ ...m, startAt: Number(currentTime || m.startAt || 0), _autoPlay: !!isPlaying, _clearLocalProgress: true }))
+      } else {
+        setMedia(prev => prev ? ({ ...prev, startAt: Number(currentTime || prev.startAt || 0), _autoPlay: !!isPlaying, _clearLocalProgress: true }) : prev)
+      }
+    })
     socket.on('play', ({ currentTime, timestamp }) => {
       setMedia((prev) => prev ? { ...prev, startAt: currentTime, _autoPlay: true } : prev)
     })
@@ -51,6 +61,7 @@ export default function App() {
       socket.off('user-list')
       socket.off('chat')
       socket.off('media-updated')
+      socket.off('force-sync')
       socket.off('play')
       socket.off('pause')
       socket.off('seek')
@@ -113,10 +124,37 @@ export default function App() {
 
   function toggleFullscreen() {
     if (!videoWrapRef.current) return
-    if (!document.fullscreenElement) {
-      videoWrapRef.current.requestFullscreen().catch(e => console.error(e))
+    const el = videoWrapRef.current
+
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement
+
+    if (!isFullscreen) {
+      // try standard API with vendor fallbacks
+      const request = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen
+      if (request) {
+        try {
+          request.call(el)
+          return
+        } catch (e) {
+          console.warn('requestFullscreen failed', e)
+        }
+      }
+
+      // iOS Safari / other mobile browsers: simulate fullscreen by applying a fixed-position class
+      el.classList.add('simulated-fullscreen')
+      // prevent body scrolling while simulated fullscreen is active
+      document.documentElement.style.overflow = 'hidden'
+      document.body.style.overflow = 'hidden'
     } else {
-      document.exitFullscreen()
+      // exit native fullscreen if available
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen
+      if (exit && (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement)) {
+        try { exit.call(document) } catch (e) { console.warn('exitFullscreen failed', e) }
+      }
+      // also remove simulated fullscreen class if present
+      el.classList.remove('simulated-fullscreen')
+      document.documentElement.style.overflow = ''
+      document.body.style.overflow = ''
     }
   }
 

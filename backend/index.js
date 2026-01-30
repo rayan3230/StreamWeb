@@ -113,13 +113,15 @@ io.on('connection', (socket) => {
   })
 
   // Host can force-sync all clients to a specific time/state
-  socket.on('force-sync', ({ roomId, currentTime, isPlaying }) => {
+  socket.on('force-sync', ({ roomId, currentTime, isPlaying, media }) => {
     const room = getRoom(roomId)
     if (!room) return
     if (room.hostId !== socket.id) return socket.emit('not-authorized', { action: 'force-sync' })
     room.currentTime = currentTime
     room.isPlaying = !!isPlaying
     room.lastUpdated = Date.now()
+    // broadcast the force-sync payload (so clients can clear per-media local progress if needed)
+    io.to(roomId).emit('force-sync', { media, currentTime: room.currentTime, isPlaying: room.isPlaying, actor: socket.id })
     // emit seek first, then play/pause to ensure clients jump then set play state
     io.to(roomId).emit('seek', { currentTime: room.currentTime, timestamp: room.lastUpdated, actor: socket.id })
     if (room.isPlaying) {

@@ -66,7 +66,8 @@ export default function MediaForm({ media, setMedia, roomId, socket }) {
           // force sync all clients to this startAt and autoPlay state
           const m = { type, id, season: Number(season), episode: Number(episode), startAt: Number(startAt), theme }
           setMedia(m)
-          socket.emit('force-sync', { roomId, currentTime: Number(startAt), isPlaying: (media?._autoPlay !== false) })
+          // include the media in the payload so clients can proactively clear local progress for that media
+          socket.emit('force-sync', { roomId, currentTime: Number(startAt), isPlaying: (media?._autoPlay !== false), media: m })
         }}>Sync All</button>
       </div>
     </div>
