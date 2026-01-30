@@ -10,22 +10,26 @@ export default function App() {
   const [roomId, setRoomId] = useState('')
   const [nickname, setNickname] = useState('')
   const [joined, setJoined] = useState(false)
-  const [isHost, setIsHost] = useState(false)
   const [users, setUsers] = useState([])
   const [hostId, setHostId] = useState(null)
   const [media, setMedia] = useState(null)
   const [messages, setMessages] = useState([])
   const messageRef = useRef()
+  const videoWrapRef = useRef(null)
+
+  const isHost = socket.id === hostId
+  const mediaRef = useRef(media)
+  useEffect(() => { mediaRef.current = media }, [media])
 
   useEffect(() => {
     socket.on('init', (state) => {
-      setIsHost(socket.id === state.hostId)
+      setHostId(state.hostId)
+      setUsers(state.users || [])
       if (state.media) setMedia(state.media)
     })
     socket.on('user-list', (payload) => {
       setUsers(payload.users)
       setHostId(payload.hostId)
-      setIsHost(socket.id === payload.hostId)
     })
     socket.on('not-authorized', (info) => {
       alert('Not authorized to perform: ' + (info?.action || 'action'))
@@ -89,6 +93,16 @@ export default function App() {
     })
   }
 
+  function leaveRoom() {
+    if (!roomId) return
+    socket.emit('leave', { roomId })
+    // reset local UI state
+    setJoined(false)
+    setMedia(null)
+    setUsers([])
+    setHostId(null)
+  }
+
   function sendChat() {
     const t = messageRef.current?.value
     if (!t) return
@@ -96,15 +110,23 @@ export default function App() {
     messageRef.current.value = ''
   }
 
-  // ping measurement and periodic status updates
+  function toggleFullscreen() {
+    if (!videoWrapRef.current) return
+    if (!document.fullscreenElement) {
+      videoWrapRef.current.requestFullscreen().catch(e => console.error(e))
+    } else {
+      document.exitFullscreen()
+    }
+  }
+
   useEffect(() => {
+    if (!joined || !roomId) return
     let ping = 0
     function doPing() {
       const ts = Date.now()
       socket.emit('ping-check', { ts })
       socket.once('ping-pong', ({ ts: echoed }) => {
         ping = Date.now() - echoed
-        setUsers((u) => u) // trigger UI update if needed
       })
     }
 
@@ -112,12 +134,13 @@ export default function App() {
     const iv = setInterval(() => {
       // compute estimated currentTime for reporting
       let estimated = 0
-      if (media) {
-        if (media._autoPlay) {
-          const ts = media.timestamp || Date.now()
-          estimated = (media.startAt || 0) + (Date.now() - ts) / 1000
+      const m = mediaRef.current
+      if (m) {
+        if (m._autoPlay) {
+          const ts = m.timestamp || Date.now()
+          estimated = (m.startAt || 0) + (Date.now() - ts) / 1000
         } else {
-          estimated = media.startAt || 0
+          estimated = m.startAt || 0
         }
       }
       const connection = navigator.connection || {}
@@ -127,7 +150,7 @@ export default function App() {
     }, 3000)
 
     return () => clearInterval(iv)
-  }, [media, roomId])
+  }, [joined, roomId])
 
   return (
     <div className={`app-container ${theater? 'theater':''}`}>
@@ -136,7 +159,7 @@ export default function App() {
           <h2>Join a watch room</h2>
           <input placeholder="Room ID" value={roomId} onChange={(e) => setRoomId(e.target.value)} />
           <input placeholder="Nickname (optional)" value={nickname} onChange={(e) => setNickname(e.target.value)} />
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <div className="flex-wrap" style={{ justifyContent: 'center' }}>
             <button onClick={joinRoom}>Join</button>
             <button onClick={createRoom} style={{ background: '#10b981' }}>Create</button>
             <button onClick={createAndJoin} style={{ background: '#8b5cf6' }}>Create & Join</button>
@@ -149,19 +172,26 @@ export default function App() {
               <div className="room-info"><strong>Room:</strong> <span className="room-code">{roomId}</span></div>
               <div className="top-controls">
                 <div className="role">{isHost? 'Role: Admin' : 'Role: Viewer'}</div>
-                <button className="plain" onClick={()=>setTheater(t=>!t)}>{theater? 'Exit Theater':'Theater'}</button>
-                <button className="plain" onClick={()=>setSidebarOpen(s=>!s)}>{sidebarOpen? 'Hide Panel':'Show Panel'}</button>
+                <button className="btn small" onClick={toggleFullscreen}>Fullscreen</button>
+                <button className="btn small" onClick={()=>setTheater(t=>!t)}>{theater? 'Exit Theater':'Theater'}</button>
+                <button className="btn small" onClick={()=>setSidebarOpen(s=>!s)}>{sidebarOpen? 'Hide Panel':'Show Panel'}</button>
+                <button className="btn btn-danger small" onClick={leaveRoom}>Leave</button>
               </div>
             </div>
-            <div style={{ position: 'relative' }}>
+            <div 
+              style={{ position: 'relative' }} 
+              ref={videoWrapRef} 
+              className="video-container"
+              onDoubleClick={toggleFullscreen}
+            >
               <MediaPlayer media={media} />
               {!isHost && (
-                <div className="video-overlay">
-                  <div>
-                    Viewing only — playback controlled by Admin
-                    <small>You'll automatically follow Admin's actions.</small>
+                <>
+                  <div className="viewer-interaction-blocker"></div>
+                  <div className="viewer-notice">
+                    Admin Room — Synced
                   </div>
-                </div>
+                </>
               )}
             </div>
             {isHost && (
@@ -180,7 +210,11 @@ export default function App() {
                     <span className="dot" style={{ background: u.id === hostId ? 'gold' : '#374151' }}></span>
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                       <div>
-                        <span style={{ fontWeight: u.id === socket.id ? 600 : 400 }}>{u.nickname}{u.id === socket.id ? ' (you)' : ''}{u.id === hostId ? ' (host)' : ''}</span>
+                        <span style={{ fontWeight: u.id === socket.id ? 600 : 400 }}>
+                          {u.nickname}
+                          {u.id === socket.id ? ' (you)' : ''}
+                          {u.id === hostId ? ' (Admin)' : ' (Viewer)'}
+                        </span>
                         <div style={{ fontSize: 12, color: '#9fb0d6' }}>{u.id}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -193,15 +227,17 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <div className="chat">
+            <div className="chat panel">
               <h3>Chat</h3>
               <div className="messages">
                 {messages.map((m, i) => (
                   <div key={i}><strong>{m.nickname}</strong>: {m.message}</div>
                 ))}
               </div>
-              <input ref={messageRef} placeholder="Message" />
-              <button onClick={sendChat}>Send</button>
+              <div className="composer">
+                <input ref={messageRef} placeholder="Message" onKeyDown={(e) => e.key === 'Enter' && sendChat()} />
+                <button onClick={sendChat}>Send</button>
+              </div>
             </div>
           </div>
         </div>

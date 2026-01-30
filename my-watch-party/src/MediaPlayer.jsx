@@ -83,6 +83,7 @@ export default function MediaPlayer({ media }) {
         src={src}
         className="video-iframe"
         allow="autoplay; fullscreen"
+        allowFullScreen
       ></iframe>
     </div>
   )

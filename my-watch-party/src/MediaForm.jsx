@@ -48,20 +48,26 @@ export default function MediaForm({ media, setMedia, roomId, socket }) {
       </div>
       <input placeholder="IMDB/TMDB id (eg. tt6263850 or 533535)" value={id} onChange={e=>setId(e.target.value)} />
       {type==='tv' && (
-        <div style={{display:'flex',gap:8}}>
+        <div className="flex-wrap">
           <input style={{width:80}} type="number" min={1} value={season} onChange={e=>setSeason(e.target.value)} placeholder="Season" />
           <input style={{width:80}} type="number" min={1} value={episode} onChange={e=>setEpisode(e.target.value)} placeholder="Episode" />
         </div>
       )}
-      <div style={{display:'flex',gap:8}}>
+      <div className="flex-wrap">
         <input style={{width:120}} type="number" min={0} value={startAt} onChange={e=>setStartAt(e.target.value)} placeholder="startAt (sec)" />
-        <input style={{width:'100%'}} placeholder="theme hex (e.g. 16A085)" value={theme} onChange={e=>setTheme(e.target.value)} />
+        <input style={{width:'100%', flex: 1}} placeholder="theme hex (e.g. 16A085)" value={theme} onChange={e=>setTheme(e.target.value)} />
       </div>
-      <div style={{display:'flex',gap:8}}>
-        <button onClick={apply} style={{background:'#2563eb'}}>Set Media</button>
-        <button onClick={play} style={{background:'#10b981'}}>Play</button>
-        <button onClick={pause} style={{background:'#ef4444'}}>Pause</button>
-        <button onClick={()=>seekTo(startAt)} style={{background:'#8b5cf6'}}>Seek</button>
+      <div className="flex-wrap">
+        <button className="btn btn-primary" onClick={apply}>Set Media</button>
+        <button className="btn btn-success" onClick={play}>Play</button>
+        <button className="btn btn-danger" onClick={pause}>Pause</button>
+        <button className="btn btn-accent" onClick={()=>seekTo(startAt)}>Seek</button>
+        <button className="btn btn-warning" onClick={() => {
+          // force sync all clients to this startAt and autoPlay state
+          const m = { type, id, season: Number(season), episode: Number(episode), startAt: Number(startAt), theme }
+          setMedia(m)
+          socket.emit('force-sync', { roomId, currentTime: Number(startAt), isPlaying: (media?._autoPlay !== false) })
+        }}>Sync All</button>
       </div>
     </div>
   )

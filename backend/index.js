@@ -61,6 +61,22 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true })
   })
 
+  socket.on('leave', ({ roomId }) => {
+    try {
+      socket.leave(roomId)
+      const room = rooms.get(roomId)
+      if (!room) return
+      delete room.users[socket.id]
+      if (room.hostId === socket.id) {
+        const ids = Object.keys(room.users)
+        room.hostId = ids.length ? ids[0] : null
+      }
+      io.to(roomId).emit('user-list', { users: Object.values(room.users), hostId: room.hostId })
+    } catch (e) {
+      // ignore
+    }
+  })
+
   socket.on('play', ({ roomId, currentTime, timestamp }) => {
     const room = getRoom(roomId)
     // only host can control playback
@@ -94,6 +110,23 @@ io.on('connection', (socket) => {
     if (room.hostId !== socket.id) return socket.emit('not-authorized', { action: 'set-media' })
     room.media = { ...media, timestamp: Date.now() }
     io.to(roomId).emit('media-updated', room.media)
+  })
+
+  // Host can force-sync all clients to a specific time/state
+  socket.on('force-sync', ({ roomId, currentTime, isPlaying }) => {
+    const room = getRoom(roomId)
+    if (!room) return
+    if (room.hostId !== socket.id) return socket.emit('not-authorized', { action: 'force-sync' })
+    room.currentTime = currentTime
+    room.isPlaying = !!isPlaying
+    room.lastUpdated = Date.now()
+    // emit seek first, then play/pause to ensure clients jump then set play state
+    io.to(roomId).emit('seek', { currentTime: room.currentTime, timestamp: room.lastUpdated, actor: socket.id })
+    if (room.isPlaying) {
+      io.to(roomId).emit('play', { currentTime: room.currentTime, timestamp: room.lastUpdated, actor: socket.id })
+    } else {
+      io.to(roomId).emit('pause', { currentTime: room.currentTime, timestamp: room.lastUpdated, actor: socket.id })
+    }
   })
 
   // clients send periodic status updates (ping, estimatedTime, connection info)

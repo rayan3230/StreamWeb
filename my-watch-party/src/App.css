@@ -30,15 +30,23 @@ body {
 
 /* Join panel */
 .join-panel {
+  width: 95%;
   max-width: 460px;
-  margin: 10vh auto;
+  margin: 5vh auto;
   background: var(--panel);
   border-radius: 14px;
-  padding: 28px;
+  padding: 20px;
   box-shadow: 0 30px 80px rgba(0,0,0,0.6);
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+@media (min-width: 640px) {
+  .join-panel {
+    padding: 28px;
+    margin: 10vh auto;
+  }
 }
 
 .join-panel input {
@@ -81,18 +89,42 @@ body {
 /* Top bar */
 .topbar {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 4px;
+}
+
+@media (min-width: 640px) {
+  .topbar {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.top-controls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 6px 2px;
 }
 
 /* 🎥 VIDEO AREA – BIG & CLEAN */
 .video-wrap {
   flex: 1;
+  min-height: 400px;
+  max-height: 80vh;
   background: #020617;
   border-radius: 14px;
   padding: 10px;
   display: flex;
+}
+
+@media (min-width: 1024px) {
+  .video-wrap {
+    height: 40rem;
+    max-height: none;
+  }
 }
 
 .video-iframe {
@@ -103,15 +135,61 @@ body {
   border: none;
 }
 
-/* Overlay */
-.video-overlay {
-  position: absolute;
-  inset: 0;
+/* Video Container & Fullscreen */
+.video-container {
+  position: relative;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.video-container:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.6));
-  border-radius: 10px;
+}
+
+.video-container:fullscreen .video-wrap {
+  width: 100%;
+  height: 100vh;
+  padding: 0;
+  border-radius: 0;
+}
+
+.viewer-interaction-blocker {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  cursor: default;
+  background: transparent;
+}
+
+.viewer-notice {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 20;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: opacity 0.3s;
+}
+
+.video-container:fullscreen .viewer-notice {
+  opacity: 0;
+}
+
+.video-container:fullscreen:hover .viewer-notice {
+  opacity: 1;
 }
 
 /* Sidebar */
@@ -124,10 +202,29 @@ body {
 .panel {
   background: var(--panel);
   border-radius: 12px;
-  padding: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
 }
 
 /* Users */
+.users.panel {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+@media (min-width: 901px) {
+  .users.panel {
+    max-height: 40%;
+  }
+}
+
 .user {
   display: flex;
   align-items: center;
@@ -147,12 +244,21 @@ body {
 }
 
 /* Chat */
+.chat.panel {
+  flex: 1;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-bottom: 12px;
+  padding-right: 4px;
 }
 
 .msg {
@@ -164,6 +270,7 @@ body {
 .chat .composer {
   display: flex;
   gap: 8px;
+  margin-top: auto;
 }
 
 .chat input {
@@ -171,7 +278,7 @@ body {
   background: #020617;
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 8px;
-  padding: 8px;
+  padding: 15px;
   color: inherit;
 }
 
@@ -185,13 +292,31 @@ body {
 /* Mobile */
 @media (max-width: 900px) {
   .room {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    height: auto;
+    overflow-y: visible;
+  }
+
+  .room:not(.sidebar-open) .right {
+    display: none;
+  }
+
+  .left {
+    height: auto;
   }
 
   .right {
     order: 2;
+    height: 600px; /* Fixed height for stacked sidebar */
+  }
+
+  .video-wrap {
+    min-height: 250px;
+    height: auto;
+    aspect-ratio: 16 / 9;
   }
 }
+
 button {
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.08);
@@ -229,4 +354,104 @@ button:disabled {
   color: #e6eef8;
   background: rgba(59,130,246,0.15);
   border-color: rgba(59,130,246,0.35);
+}
+
+/* Utility */
+.flex-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Room button styles (used for admin controls and general buttons) */
+.btn { display:inline-block; padding:8px 12px; border-radius:10px; border:none; font-weight:700; cursor:pointer; color:#fff; background:var(--accent); box-shadow:0 8px 20px rgba(2,6,23,0.6); transition:transform .06s ease, box-shadow .12s ease; }
+.btn:active{ transform: translateY(1px); }
+.btn.btn-primary{ background:var(--accent); }
+.btn.btn-primary:hover{ background:#2e86ff }
+.btn.btn-success{ background:var(--success); }
+.btn.btn-success:hover{ background:#0ea36a }
+.btn.btn-danger{ background:#ef4444; }
+.btn.btn-danger:hover{ background:#e24a4a }
+.btn.btn-accent{ background:var(--accent-2); }
+.btn.btn-accent:hover{ background:#7c45e8 }
+
+/* small variant for topbar */
+.btn.small{ padding:6px 8px; font-size:13px; font-weight:600 }
+
+/* warning variant for sync */
+.btn.btn-warning{ background:#f59e0b }
+.btn.btn-warning:hover{ background:#d97706 }
+
+
+/* ============================
+   MEDIA WINDOW (FLOATING)
+============================ */
+
+.media-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--panel);
+  border-radius: 14px;
+  box-shadow: 0 30px 90px rgba(0,0,0,0.7);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+}
+
+/* Header = drag area */
+.window-header {
+  height: 36px;
+  background: linear-gradient(
+    180deg,
+    rgba(15,23,42,0.95),
+    rgba(2,6,23,0.95)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: grab;
+  user-select: none;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.window-header:active {
+  cursor: grabbing;
+}
+
+/* Video area */
+.window-content {
+  flex: 1;
+  background: black;
+}
+
+.window-content .video-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Resize handle (bottom-right) */
+.resize-handle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  right: 4px;
+  bottom: 4px;
+  cursor: nwse-resize;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(255,255,255,0.4);
+  border-bottom: 2px solid rgba(255,255,255,0.4);
 }
