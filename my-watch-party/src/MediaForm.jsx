@@ -66,8 +66,22 @@ export default function MediaForm({ media, setMedia, roomId, socket }) {
           // force sync all clients to this startAt and autoPlay state
           const m = { type, id, season: Number(season), episode: Number(episode), startAt: Number(startAt), theme }
           setMedia(m)
-          // include the media in the payload so clients can proactively clear local progress for that media
-          socket.emit('force-sync', { roomId, currentTime: Number(startAt), isPlaying: (media?._autoPlay !== false), media: m })
+          // attempt to gather admin's localStorage progress for this media (best-effort; may be blocked by origin)
+          const adminProgress = {}
+          try {
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i)
+              if (!key) continue
+              // include keys that look like progress keys or contain the media id
+              if (key.startsWith('progress') || (id && key.includes(String(id)))) {
+                adminProgress[key] = localStorage.getItem(key)
+              }
+            }
+          } catch (e) {
+            // access to localStorage may be denied in some contexts; ignore
+          }
+          // include the media and any admin progress in the payload so clients can apply it before loading
+          socket.emit('force-sync', { roomId, currentTime: Number(startAt), isPlaying: (media?._autoPlay !== false), media: m, adminProgress })
         }}>Sync All</button>
       </div>
     </div>

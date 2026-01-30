@@ -38,7 +38,17 @@ export default function App() {
     socket.on('force-sync', (payload) => {
       // payload may include media so clients can clear local progress before seeking
       if (!payload) return
-      const { media: m, currentTime, isPlaying } = payload
+      const { media: m, currentTime, isPlaying, adminProgress } = payload
+      // if adminProgress was provided, try to apply it into localStorage (best-effort)
+      if (adminProgress && typeof window !== 'undefined') {
+        try {
+          Object.entries(adminProgress).forEach(([k, v]) => {
+            try { localStorage.setItem(k, v) } catch (e) { /* ignore storage errors */ }
+          })
+        } catch (e) {
+          // ignore
+        }
+      }
       if (m) {
         setMedia(prev => ({ ...m, startAt: Number(currentTime || m.startAt || 0), _autoPlay: !!isPlaying, _clearLocalProgress: true }))
       } else {
